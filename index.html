@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Penjadwalan - Critical Path Method (CPM)</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Palette Tema Krem & Profesional (Sama dengan Modul 1) */
+            --bg-body: #fbf9f6;      
+            --bg-surface: #ffffff;   
+            --bg-surface-alt: #f4efe6; 
+            
+            --border-subtle: #eae3d5; 
+            --border-strong: #d8caba; 
+            
+            --text-primary: #3d3832; 
+            --text-secondary: #7a7165; 
+            --text-tertiary: #a3998b;
+            
+            --brand-primary: #8a7354; 
+            --brand-primary-hover: #735e42;
+            --brand-dark: #4a3f31;    
+            --brand-dark-hover: #362e23;
+            
+            --status-success-bg: #edf4f0;
+            --status-success-text: #276343;
+            --status-success-border: #c3d9cc;
+            
+            --status-error-bg: #fef2f2;
+            --status-error-text: #b91c1c;
+            --status-error-border: #fca5a5;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(74, 63, 49, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(74, 63, 49, 0.1), 0 2px 4px -1px rgba(74, 63, 49, 0.06);
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- NAVBAR --- */
+        .navbar {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0 2rem;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--brand-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navbar-brand::before {
+            content: "❖";
+            color: var(--brand-primary);
+            font-size: 1.4rem;
+        }
+
+        /* --- LAYOUT UTAMA --- */
+        .app-container {
+            max-width: 100%; 
+            margin: 0 auto;
+            padding: 2rem 2.5rem; 
+            flex: 1;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .page-header { margin-bottom: 2rem; }
+        .page-header h1 { margin: 0 0 0.5rem 0; font-size: 1.8rem; font-weight: 700; color: var(--text-primary); }
+        .page-header p { margin: 0; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5; }
+
+        /* --- KARTU (CARDS) --- */
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            background-color: var(--bg-surface-alt);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title { font-weight: 600; font-size: 1.05rem; color: var(--brand-dark); margin: 0; }
+        .card-body { padding: 1.5rem; }
+
+        /* --- KONTROL (FORM INPUTS) --- */
+        .controls-wrapper { display: flex; flex-direction: column; }
+        .controls-row-top { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end; }
+        .controls-row-bottom { display: flex; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border-subtle); }
+
+        .input-group { display: flex; flex-direction: column; gap: 0.5rem; }
+        .input-group label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .input-hint { font-size: 0.7rem; color: var(--text-tertiary); margin-top: -2px; }
+
+        input[type="number"]:not(.table-input), input[type="text"]:not(.table-input) {
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-strong);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s;
+            min-width: 180px;
+            box-sizing: border-box;
+        }
+
+        input[type="number"]:focus, input[type="text"]:focus {
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 3px rgba(138, 115, 84, 0.15);
+        }
+
+        .inline-actions { display: flex; gap: 0.75rem; margin-bottom: 15px; }
+
+        button {
+            cursor: pointer;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: 1px solid var(--border-strong);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            height: fit-content;
+        }
+
+        button:hover { background: var(--bg-surface-alt); border-color: var(--brand-primary); color: var(--brand-dark); }
+        .btn-solve { background: var(--brand-dark); color: white; border-color: var(--brand-dark); margin-bottom: 0; }
+        .btn-solve:hover { background: var(--brand-dark-hover); border-color: var(--brand-dark-hover); color: white; box-shadow: var(--shadow-md); }
+
+        /* --- TABEL --- */
+        .table-wrapper { 
+            width: 100%;
+            border: 1px solid var(--border-strong);
+            border-radius: 8px;
+            background: var(--bg-surface);
+            box-shadow: var(--shadow-sm);
+            overflow-x: auto; 
+        }
+
+        table { border-collapse: collapse; width: 100%; margin: 0; }
+        td, th { border: 1px solid var(--border-subtle); text-align: center; padding: 0; height: 42px; }
+        th { background: #faf7f2; color: var(--text-secondary); font-weight: 600; font-size: 0.85rem; padding: 10px; white-space: nowrap; }
+
+        /* Input di dalam tabel */
+        td input.table-input { 
+            width: 100%; 
+            height: 100%;
+            min-width: 0; 
+            box-sizing: border-box;
+            border: none; 
+            background: transparent; 
+            color: var(--brand-dark); 
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem; 
+            outline: none;
+            transition: background 0.2s;
+            padding: 8px 10px; 
+            margin: 0;
+        }
+
+        td input.table-input:focus {
+            background: #fcfbfa;
+            box-shadow: inset 0 0 0 2px var(--brand-primary);
+        }
+
+        /* --- EDU PANEL --- */
+        .edu-panel {
+            background: #faf7f2;
+            padding: 1.5rem;
+            border-left: 4px solid var(--brand-primary);
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border-subtle);
+            border-right: 1px solid var(--border-subtle);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .edu-panel strong { color: var(--brand-dark); font-weight: 600; }
+        .edu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;}
+
+        /* --- LANGKAH PERHITUNGAN --- */
+        .step-container {
+            background: var(--bg-surface);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            border-left: 4px solid var(--brand-primary);
+            box-shadow: var(--shadow-sm);
+        }
+        .step-container h4 { color: var(--brand-dark); margin-top: 0; font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+        .step-container h4::before { content: "↓"; color: var(--brand-primary); font-weight: bold; }
+        .step-container ul { margin: 0; padding-left: 20px; font-family: 'Fira Code', monospace; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; }
+        .step-container li { margin-bottom: 6px; }
+        .step-container b { color: var(--text-primary); }
+
+        /* --- KESIMPULAN HASIL --- */
+        .result-box {
+            background: var(--status-success-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            border: 1px solid var(--status-success-border);
+            color: var(--status-success-text);
+        }
+        .result-box ul { margin: 0; padding-left: 0; list-style-type: none; }
+        .result-box li { position: relative; margin-bottom: 0.5rem; padding-left: 1.5rem; padding-bottom: 0.5rem; border-bottom: 1px dashed rgba(39, 99, 67, 0.2); }
+        .result-box li:last-child { border-bottom: none; }
+        .result-box li::before { content: "✓"; position: absolute; left: 0; color: var(--status-success-text); font-weight: bold; }
+        .result-box b { color: #1a452f; font-weight: 600; }
+
+        /* --- DIAGRAM JARINGAN --- */
+        #network-canvas {
+            width: 100%;
+            height: 500px;
+            background: #faf7f2;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid var(--border-strong);
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+        }
+        
+        .badge-kritis { background: var(--status-error-text); color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
+        .badge-aman { background: var(--status-success-border); color: var(--status-success-text); padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem; }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--brand-primary); }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="navbar-brand">Decision Support System</div>
+    <div style="font-size: 0.85rem; color: var(--text-tertiary); font-weight: 500;">Modul 2: Critical Path Method (CPM)</div>
+</nav>
+
+<main class="app-container">
+    <header class="page-header">
+        <h1>Manajemen Proyek & Penjadwalan</h1>
+        <p>Peluncuran Aplikasi Pariwisata menggunakan Critical Path Method (CPM) untuk mengidentifikasi jalur kritis waktu penyelesaian proyek.</p>
+    </header>
+
+    <section class="card">
+        <div class="card-header">
+            <h2 class="card-title">Parameter Kegiatan</h2>
+        </div>
+        <div class="card-body">
+            <div class="controls-wrapper">
+                <div class="controls-row-top">
+                    <div class="input-group">
+                        <label for="n">Jumlah Aktivitas</label>
+                        <input type="number" id="n" min="8" max="20" value="10">
+                        <span class="input-hint">*Rentang batas 8 hingga 20</span>
+                    </div>
+                    <div class="inline-actions">
+                        <button onclick="generateTable(false)">📝 Buat Tabel Kosong</button>
+                        <button onclick="generateTable(true)">📦 Muat Kasus Aplikasi</button>
+                    </div>
+                </div>
+
+                <div class="controls-row-bottom">
+                    <button class="btn-solve" onclick="solveCPM()">▶ Hitung CPM & Gambar Jaringan</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card" id="input-section">
+        <div class="card-header">
+            <h2 class="card-title">Data Komponen Jaringan</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-wrapper" id="form-container">
+                </div>
+        </div>
+    </section>
+
+    <div id="result-section" style="display:none;">
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">Panduan Parameter Analisis</h2>
+            </div>
+            <div class="card-body">
+                <div class="edu-panel">
+                    <div style="margin-bottom: 10px;">
+                        <strong>Slack / Float (Kelonggaran Waktu):</strong> Toleransi keterlambatan <code>(Slack = LS - ES)</code>. Jika Slack bernilai 0, maka aktivitas tersebut berada pada <strong>Jalur Kritis</strong>.
+                    </div>
+                    <hr style="border:none; border-top:1px solid var(--border-subtle); margin: 15px 0;">
+                    <div class="edu-grid">
+                        <div>
+                            <strong>Hitungan Maju (Forward Pass):</strong><br>
+                            • <strong>ES (Earliest Start):</strong> Waktu paling awal aktivitas dapat dimulai (Maksimum EF pendahulu).<br>
+                            • <strong>EF (Earliest Finish):</strong> Waktu paling awal aktivitas selesai <code>(EF = ES + Durasi)</code>.
+                        </div>
+                        <div>
+                            <strong>Hitungan Mundur (Backward Pass):</strong><br>
+                            • <strong>LF (Latest Finish):</strong> Waktu paling lambat aktivitas harus selesai (Minimum LS penerus).<br>
+                            • <strong>LS (Latest Start):</strong> Waktu paling lambat aktivitas harus dimulai <code>(LS = LF - Durasi)</code>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">Transparansi Langkah Perhitungan</h2>
+            </div>
+            <div class="card-body" style="background-color: var(--bg-body);">
+                <div id="cpm-steps"></div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">Tabel Hasil Kalkulasi Parameter</h2>
+            </div>
+            <div class="card-body">
+                <div class="table-wrapper" id="output-table"></div>
+                <div id="summary" class="result-box" style="margin-top: 20px;"></div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <h2 class="card-title">Visualisasi Diagram Jaringan (Network Diagram)</h2>
+            </div>
+            <div class="card-body">
+                <p style="text-align: center; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0;">
+                    *Node berwarna <b style="color:var(--status-error-text);">Merah</b> menunjukkan aktivitas pada Jalur Kritis. Anda dapat menggeser (drag) atau zoom diagram.
+                </p>
+                <div id="network-canvas"></div>
+            </div>
+        </section>
+    </div>
+</main>
+
+<script>
+let N = 10;
+
+// Kolam Data untuk fitur "Muat Kasus"
+const poolData = [
+    { desc: "Riset Pasar & Lokasi Wisata", dur: 2, predIdx: [] },
+    { desc: "Desain UI/UX Mobile", dur: 3, predIdx: [0] },
+    { desc: "Arsitektur Database", dur: 2, predIdx: [0] },
+    { desc: "Coding Frontend (Mobile)", dur: 4, predIdx: [1] },
+    { desc: "Coding Backend & API", dur: 4, predIdx: [2] },
+    { desc: "Integrasi Sistem", dur: 2, predIdx: [3, 4] },
+    { desc: "Setup Cloud Server", dur: 1, predIdx: [2] },
+    { desc: "Alpha Testing", dur: 2, predIdx: [5] },
+    { desc: "Fix Bug Alpha", dur: 1, predIdx: [7] },
+    { desc: "Beta Testing Tertutup", dur: 2, predIdx: [6, 8] },
+    { desc: "Pembuatan Materi Promo", dur: 2, predIdx: [1] },
+    { desc: "Video Promosi", dur: 2, predIdx: [10] },
+    { desc: "Pelatihan Customer Service", dur: 1, predIdx: [5] },
+    { desc: "Uji Keamanan (Security Test)", dur: 1, predIdx: [5] },
+    { desc: "Perbaikan Celah Keamanan", dur: 1, predIdx: [13] },
+    { desc: "Load Testing Server", dur: 1, predIdx: [6] },
+    { desc: "Optimasi Kinerja App", dur: 1, predIdx: [15] },
+    { desc: "Review App/Play Store", dur: 2, predIdx: [9] },
+    { desc: "Kampanye Pre-Launch", dur: 2, predIdx: [11] }
+];
+
+function generateTable(loadDynamicCase) {
+    N = parseInt(document.getElementById("n").value);
+    if (N < 8 || N > 20) { 
+        alert("MAAF, PROSES DITOLAK!\n\nSesuai kriteria sistem, jumlah aktivitas harus berada di rentang 8 hingga 20."); 
+        return; 
+    }
+
+    let tasks = [];
+
+    if (loadDynamicCase) {
+        let isReferenced = new Array(N-1).fill(false);
+        for(let i = 0; i < N - 1; i++) {
+            let pList = poolData[i].predIdx.filter(idx => idx < i).map(idx => String.fromCharCode(65 + idx));
+            poolData[i].predIdx.forEach(idx => { if (idx < N - 1) isReferenced[idx] = true; });
+            tasks.push({ id: String.fromCharCode(65 + i), desc: poolData[i].desc, dur: poolData[i].dur, pred: pList.join(", ") });
+        }
+        let dangling = [];
+        for(let i = 0; i < N - 1; i++) {
+            if(!isReferenced[i]) dangling.push(String.fromCharCode(65 + i));
+        }
+        tasks.push({ id: String.fromCharCode(65 + N - 1), desc: "Peluncuran Resmi & Press Release", dur: 1, pred: dangling.join(", ") });
+    }
+
+    let html = `<table><tr>
+        <th width="12%">ID Kegiatan</th>
+        <th width="43%">Deskripsi Pekerjaan</th>
+        <th width="20%">Durasi (Minggu)</th>
+        <th width="25%">Prasyarat (Gunakan Koma)</th>
+    </tr>`;
+
+    for (let i = 0; i < N; i++) {
+        let d = loadDynamicCase ? tasks[i] : { id: String.fromCharCode(65 + i), desc: `Aktivitas ${i+1}`, dur: 1, pred: "" };
+        html += `
+        <tr>
+            <td><input type="text" class="table-input" style="text-align:center; font-weight:bold;" id="id_${i}" value="${d.id}"></td>
+            <td><input type="text" class="table-input" style="text-align:left;" id="desc_${i}" value="${d.desc}"></td>
+            <td><input type="number" class="table-input" style="text-align:center;" id="dur_${i}" min="1" value="${d.dur}"></td>
+            <td><input type="text" class="table-input" style="text-align:center;" id="pred_${i}" value="${d.pred}" placeholder="-"></td>
+        </tr>`;
+    }
+    html += "</table>";
+    document.getElementById("form-container").innerHTML = html;
+    document.getElementById("result-section").style.display = "none";
+}
+
+function getTaskData() {
+    let tasks = [];
+    for (let i = 0; i < N; i++) {
+        let idVal = document.getElementById("id_" + i).value.trim();
+        let predVal = document.getElementById("pred_" + i).value.trim();
+        if(!idVal) continue;
+        tasks.push({
+            id: idVal.toUpperCase(), 
+            desc: document.getElementById("desc_" + i).value,
+            dur: parseInt(document.getElementById("dur_" + i).value) || 0,
+            pred: predVal ? predVal.toUpperCase().split(",").map(s => s.trim()) : []
+        });
+    }
+    return tasks;
+}
+
+function topologicalSort(tasks) {
+    let map = {};
+    tasks.forEach(t => map[t.id] = t);
+    let visited = {};
+    let order = [];
+    function dfs(id) {
+        if (visited[id]) return;
+        visited[id] = true;
+        let t = map[id];
+        if (t) {
+            t.pred.forEach(p => { if(map[p]) dfs(p); });
+            order.push(t);
+        }
+    }
+    tasks.forEach(t => dfs(t.id));
+    return order;
+}
+
+function solveCPM() {
+    let inputSize = parseInt(document.getElementById("n").value);
+    if (isNaN(inputSize) || inputSize < 8 || inputSize > 20) {
+        alert("MAAF, PROSES DITOLAK!\n\nSesuai kriteria sistem, jumlah aktivitas harus berada di rentang 8 hingga 20.");
+        return;
+    }
+
+    let tasks = getTaskData();
+    let order = topologicalSort(tasks);
+    
+    let ES = {}, EF = {}, LS = {}, LF = {}, slack = {};
+    let stepHtml = "";
+
+    // 1. Hitungan Maju (Forward Pass)
+    stepHtml += `<div class="step-container"><h4>Langkah 1: Hitungan Maju (Mencari ES dan EF)</h4><ul>`;
+    order.forEach(t => {
+        if (t.pred.length === 0) {
+            ES[t.id] = 0;
+            stepHtml += `<li><b>${t.id}</b>: Tidak ada prasyarat &rarr; ES ditetapkan <b>0</b>. <br>&nbsp;&nbsp; EF = ES + Durasi = 0 + ${t.dur} = <b>${t.dur}</b>.</li>`;
+        } else {
+            let maxEF = 0;
+            let efList = [];
+            t.pred.forEach(p => { 
+                if(EF[p] !== undefined) {
+                    efList.push(`${p}(EF:${EF[p]})`);
+                    if(EF[p] > maxEF) maxEF = EF[p]; 
+                }
+            });
+            ES[t.id] = maxEF;
+            stepHtml += `<li><b>${t.id}</b>: Prasyarat [${efList.join(", ")}] &rarr; ES = Nilai Maksimum = <b>${maxEF}</b>. <br>&nbsp;&nbsp; EF = ES + Durasi = ${maxEF} + ${t.dur} = <b>${maxEF + t.dur}</b>.</li>`;
+        }
+        EF[t.id] = ES[t.id] + t.dur;
+    });
+    stepHtml += `</ul></div>`;
+
+    let projectDuration = Math.max(...Object.values(EF));
+
+    // 2. Hitungan Mundur (Backward Pass)
+    stepHtml += `<div class="step-container"><h4>Langkah 2: Hitungan Mundur (Mencari LF dan LS dari Total ${projectDuration} Minggu)</h4><ul>`;
+    let reverseOrder = [...order].reverse();
+    reverseOrder.forEach(t => {
+        let successors = tasks.filter(x => x.pred.includes(t.id));
+        
+        if (successors.length === 0) {
+            LF[t.id] = projectDuration;
+            stepHtml += `<li><b>${t.id}</b>: Aktivitas terminal (tidak memiliki penerus) &rarr; LF ditetapkan <b>${projectDuration}</b>. <br>&nbsp;&nbsp; LS = LF - Durasi = ${projectDuration} - ${t.dur} = <b>${projectDuration - t.dur}</b>.</li>`;
+        } else {
+            let minLS = Infinity;
+            let lsList = [];
+            successors.forEach(s => { 
+                if(LS[s.id] !== undefined) {
+                    lsList.push(`${s.id}(LS:${LS[s.id]})`);
+                    if(LS[s.id] < minLS) minLS = LS[s.id]; 
+                }
+            });
+            LF[t.id] = minLS;
+            stepHtml += `<li><b>${t.id}</b>: Diteruskan oleh [${lsList.join(", ")}] &rarr; LF = Nilai Minimum = <b>${minLS}</b>. <br>&nbsp;&nbsp; LS = LF - Durasi = ${minLS} - ${t.dur} = <b>${minLS - t.dur}</b>.</li>`;
+        }
+        LS[t.id] = LF[t.id] - t.dur;
+    });
+    stepHtml += `</ul></div>`;
+
+    // 3. Kalkulasi Slack
+    stepHtml += `<div class="step-container"><h4>Langkah 3: Menentukan Slack & Jalur Kritis (Slack = LS - ES)</h4><ul>`;
+    tasks.forEach(t => {
+        slack[t.id] = LS[t.id] - ES[t.id];
+        let isCritStr = slack[t.id] === 0 ? ` &rarr; <span style="color:var(--status-error-text); font-weight:bold;">[KRITIS]</span>` : "";
+        stepHtml += `<li><b>${t.id}</b>: Slack = ${LS[t.id]} - ${ES[t.id]} = <b>${slack[t.id]}</b>${isCritStr}</li>`;
+    });
+    stepHtml += `</ul></div>`;
+
+    document.getElementById("cpm-steps").innerHTML = stepHtml;
+
+    let criticalPath = tasks.filter(t => slack[t.id] === 0).map(t => t.id);
+
+    // --- RENDER TABEL AKHIR ---
+    let out = `<table><tr>
+        <th>ID</th><th>Deskripsi</th><th>Durasi</th>
+        <th title="Earliest Start">ES</th><th title="Earliest Finish">EF</th>
+        <th title="Latest Start">LS</th><th title="Latest Finish">LF</th>
+        <th>Slack</th><th>Status</th>
+    </tr>`;
+
+    tasks.forEach(t => {
+        let isCrit = slack[t.id] === 0;
+        let rowBg = isCrit ? 'var(--status-error-bg)' : 'transparent';
+        let idColor = isCrit ? 'var(--status-error-text)' : 'var(--brand-dark)';
+        
+        out += `<tr style="background-color: ${rowBg};">
+            <td style="color:${idColor}; font-weight:bold;">${t.id}</td>
+            <td style="text-align:left; padding-left:10px;">${t.desc}</td>
+            <td>${t.dur}</td>
+            <td>${ES[t.id]}</td><td>${EF[t.id]}</td>
+            <td>${LS[t.id]}</td><td>${LF[t.id]}</td>
+            <td><b>${slack[t.id]}</b></td>
+            <td><span class="${isCrit ? 'badge-kritis' : 'badge-aman'}">${isCrit ? 'Kritis' : 'Aman'}</span></td>
+        </tr>`;
+    });
+    out += "</table>";
+    document.getElementById("output-table").innerHTML = out;
+
+    // --- RENDER KESIMPULAN ---
+    document.getElementById("summary").innerHTML = `
+        <ul>
+            <li><b>Total Waktu Penyelesaian Proyek:</b> ${projectDuration} Minggu.</li>
+            <li><b>Jalur Kritis Utama (Jalur Merah):</b> ${criticalPath.join(" &rarr; ")}. Aktivitas pada jalur ini tidak memiliki kelonggaran waktu (Slack = 0) dan harus dijaga ketat pelaksanaannya agar tidak menunda jadwal keseluruhan proyek.</li>
+            <li><b>Jalur Non-Kritis (Jalur Aman):</b> Aktivitas di luar jalur kritis memiliki kelonggaran waktu (Slack > 0), sehingga penundaan pengerjaan masih dapat ditoleransi selama tidak melebihi batas nilai Slack masing-masing.</li>
+        </ul>`;
+
+    document.getElementById("result-section").style.display = "block";
+    renderNetwork(tasks, ES, EF, LS, LF, slack);
+}
+
+function renderNetwork(tasks, ES, EF, LS, LF, slack) {
+    let nodesArray = tasks.map(t => {
+        let isCrit = slack[t.id] === 0;
+        return {
+            id: t.id,
+            label: `[ ${t.id} ]\n${t.desc}\nDurasi: ${t.dur}\nES:${ES[t.id]} | EF:${EF[t.id]}\nLS:${LS[t.id]} | LF:${LF[t.id]}`,
+            shape: 'box',
+            color: {
+                background: isCrit ? '#fee2e2' : '#ffffff',
+                border: isCrit ? '#ef4444' : '#8a7354',
+                highlight: { background: isCrit ? '#fca5a5' : '#f4efe6', border: isCrit ? '#b91c1c' : '#4a3f31' }
+            },
+            font: { color: isCrit ? '#991b1b' : '#3d3832', face: 'monospace', align: 'left', size: 13, bold: { color: isCrit ? '#7f1d1d' : '#000000'} },
+            borderWidth: isCrit ? 2 : 1,
+            margin: 10
+        };
+    });
+
+    let edgesArray = [];
+    tasks.forEach(t => {
+        t.pred.forEach(p => {
+            if(p) {
+                let isCriticalEdge = slack[t.id] === 0 && slack[p] === 0 && (EF[p] === ES[t.id]);
+                edgesArray.push({
+                    from: p,
+                    to: t.id,
+                    arrows: 'to',
+                    color: { color: isCriticalEdge ? '#ef4444' : '#d8caba' },
+                    width: isCriticalEdge ? 3 : 1.5
+                });
+            }
+        });
+    });
+
+    let container = document.getElementById('network-canvas');
+    let data = {
+        nodes: new vis.DataSet(nodesArray),
+        edges: new vis.DataSet(edgesArray)
+    };
+    let options = {
+        layout: { hierarchical: { direction: 'LR', sortMethod: 'directed', nodeSpacing: 180, levelSeparation: 250 } },
+        physics: { enabled: false },
+        interaction: { dragNodes: true, zoomView: true, dragView: true }
+    };
+    
+    new vis.Network(container, data, options);
+}
+
+// Inisialisasi awal saat web dibuka
+window.onload = () => { generateTable(true); };
+</script>
+
+</body>
+</html>
